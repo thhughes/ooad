@@ -1,6 +1,7 @@
-from interfaces import *		
 import random
 import string
+from .interfaces import Move, MoveResult, Player, LegalMoveChecker, \
+	GameBoard, GameRunner, SequenceSearcher
 
 class TicTacToeMove(Move): 
 	X_POS = 'X Position'
@@ -27,7 +28,7 @@ class TicTacToeMove(Move):
 			
 class HumanInputPlayer(Player): 
 	def __init__(self, name: str):
-		self.set_name(name)
+		super().__init__(**{Player.NAME:name})
 	
 	def get_move(self) -> Move: 
 		_column = self.prompt_user("column")
@@ -45,11 +46,16 @@ class StupidAI(Player):
 	}
 
 	def __init__(self):
-		self.set_name(self.__generate_random_name())
+		super().__init__(**{Player.NAME:self.__generate_random_name()})
 		self.__attempted_moves = {}
 
+	def __pick_unique_move(self): 
+		m = self.__get_unique()
+		self.__attempted_moves[m] = self.TIC_TAC_TOE_MOVES[m]
+		return self.TIC_TAC_TOE_MOVES[m]
+	
 	def get_move(self) -> Move: 
-		col, row = __pick_unique_move()
+		_column, _row = self.__pick_unique_move()
 		return TicTacToeMove(_column, _row, self.get_name())
 	
 	def __generate_random_name(self): 
@@ -61,25 +67,22 @@ class StupidAI(Player):
 		m = random.choice(self.TIC_TAC_TOE_MOVES.keys())
 		while m in self.__attempted_moves: 
 			m = random.choice(self.TIC_TAC_TOE_MOVES.keys())
-		return m 
+		return m
 
-	def __pick_unique_move(self): 
-		m = self.__get_unique()
-		self.__attempted_moves[m] = self.TIC_TAC_TOE_MOVES[m]
-		return self.TIC_TAC_TOE_MOVES[m]
+
 
 			
-class TicTacToeRuleset(BoardRuleset):
+class TicTacToeRuleset(LegalMoveChecker):
 	def __init__(self, board_size): 
 		self.__board_size = board_size
 		self.__min_row_col = 0
 		self.__max_row_col = self.__board_size - 1
 		
-	def is_legal_move(self, raw: Move) -> bool: 
-		'''
+	def is_legal_move(self, move: Move) -> bool: 
+		"""
 			A move is legal if it's in bounds and has a valid name to place
-		'''
-		_move = TicTacToeMove.from_raw(raw)
+		"""
+		_move = TicTacToeMove.from_raw(move)
 		def is_out_of_bounds(to_check): 
 			return self.__min_row_col < to_check or to_check > self.__max_row_col 
 		if is_out_of_bounds(_move.get_x()): 
@@ -113,20 +116,20 @@ class TicTacToeGB(GameBoard):
 	
 	def initialize(self, *args, **kwargs): 
 		self.__board = [[None for j in range(self.__board_size)] for i in range(self.__board_size)]
-		return 
 		
-	def get_board_ruleset(self) -> BoardRuleset: 
+	def get_board_ruleset(self) -> LegalMoveChecker: 
 		return self.__board_ruleset
 	
 	def update_board_with_move(self, move: Move) -> MoveResult: 
 		# We check again for safety, though canonically not required. 
-		assert self.get_board_ruleset().is_legal_move(move), "Illegal moved passed into update_board_with_move"
+		assert self.get_board_ruleset().is_legal_move(move), "Illegal "\
+			"moved passed into update_board_with_move"
 		
 		gbuc = self.__process_move(TicTacToeMove.from_raw(move))
 		return self.__update_board_state(gbuc)
 		
 	def is_game_complete(self): 
-		return self._game_completed
+		return self.__game_completed
 		
 	def display(self) -> None: 
 		def clean_data(inp): 
@@ -138,7 +141,7 @@ class TicTacToeGB(GameBoard):
 		print(print_data)
 	
 	def __is_cell_empty(self, row, column): 
-		return self.__board[row][column] != None 
+		return self.__board[row][column] is not None 
 		
 	def __apply_move_to_cell(self, row, column, name): 
 		self.__board[row][column] = name
@@ -147,11 +150,14 @@ class TicTacToeGB(GameBoard):
 		res = MoveResult()
 		x = move.get_x()
 		y = move.get_y()
-		if not self._is_cell_empty(y, x): 
+		if not self.__is_cell_empty(y, x): 
 			return res
-		self._apply_move_to_cell(y, x, move.get_name())
+		self.__apply_move_to_cell(y, x, move.get_name())
 		res.set_move_was_applied()
 		return res
+	
+	def __no_moves_left(self): 
+		pass 
 		
 	def __update_board_state(self, res: MoveResult) -> MoveResult: 
 		if not res.was_move_applied(): 
@@ -172,21 +178,6 @@ class TicTacToeGB(GameBoard):
 		
 		# Game has not ended 
 		return res
-
-
-			 				 	
-			
-def foo(*args, **kwargs): 
-	print(kwargs)
-	return kwargs
-		
-
-
-if __name__ == "__main__": 
-	print("Hello world") 
-	print(type(foo(**{"FOOBAR":1, "BARFOO":2})))
 	
-	b = TicTacToeGB(**{TicTacToeGB.EMPTY_CELL_VALUE:'?'})
-	b.initialize()
-	b.display()
-	
+class TicTacToe(GameRunner): 
+	pass 
